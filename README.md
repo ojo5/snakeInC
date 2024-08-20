@@ -19,7 +19,6 @@ GCC (GNU Compiler Collection) for compiling the code.
 Clone the Repository:
 
 ```sh
-Copy code
 git clone https://github.com/your-username/x11-window-example.git
 cd x11-window-example
 ```
