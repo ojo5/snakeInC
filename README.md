@@ -1,5 +1,5 @@
 # Snake Game V.1
-This repository contains a simple example of creating a window using the X Window System (Xlib) in C. The example demonstrates how to initialize a connection to the X server, create a window, handle basic events, and clean up resources.
+This repository contains a simple example of creating a window using the X Window System (Xlib) in C. The code demonstrates how to initialize a connection to the X server, create a window, handle basic events, and clean up resources.
 
 ## Overview
 The provided code showcases how to create and display a basic X11 window on Linux. It sets up the window with a specific size, position, and colors. The code also includes a basic event loop to handle window exposure and key press events.
