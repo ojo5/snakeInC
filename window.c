@@ -5,11 +5,18 @@
 #include <time.h>
 #include <unistd.h>  // For usleep
 
+// Define keycodes for arrow keys
+#define LEFT_ARROW  XK_Left
+#define RIGHT_ARROW XK_Right
+#define UP_ARROW    XK_Up
+#define DOWN_ARROW  XK_Down
+
 // Function declarations
 Window createWindow(Display *display, int screen, int x, int y, unsigned int width, unsigned int height);
 GC createGraphicsContext(Display *display, Window window);
 void handleExposeEvent(Display *display, Window window, GC gc, XEvent *event);
 void updateBoxPosition(Display *display, Window window, GC gc, int newX, int newY);
+void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *boxX, int *boxY);
 void cleanup(Display *display, Window window, GC gc);
 
 // Function to create a simple X11 window
@@ -34,10 +41,49 @@ GC createGraphicsContext(Display *display, Window window) {
     return gc;
 }
 
-// Function to update box position
+// Function to update box position and clear the screen
 void updateBoxPosition(Display *display, Window window, GC gc, int newX, int newY) {
+    // Clear the entire window by filling it with black
+    XSetForeground(display, gc, BlackPixel(display, DefaultScreen(display)));
+    XFillRectangle(display, window, gc, 0, 0, 800, 800);
+
+    // Set the color for the new rectangle
+    XSetForeground(display, gc, WhitePixel(display, DefaultScreen(display)));
+
     // Draw the box at the new position
     XFillRectangle(display, window, gc, newX, newY, 20, 20);
+}
+
+
+// Function to handle KeyPress events
+void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *boxX, int *boxY) {
+    int moveAmount = 20; // Distance the box moves with each arrow key press
+    KeySym key = XLookupKeysym(&event->xkey, 0);
+    switch (key) {
+        case LEFT_ARROW:
+            *boxX -= moveAmount; // Move left
+            break;
+        case RIGHT_ARROW:
+            *boxX += moveAmount; // Move right
+            break;
+        case UP_ARROW:
+            *boxY -= moveAmount; // Move up
+            break;
+        case DOWN_ARROW:
+            *boxY += moveAmount; // Move down
+            break;
+        default:
+            break;
+    }
+
+    // Ensure the box stays within the window boundaries
+    if (*boxX < 0) *boxX = 0;
+    if (*boxX > 780) *boxX = 780;
+    if (*boxY < 0) *boxY = 0;
+    if (*boxY > 780) *boxY = 780;
+
+    // Update the box position
+    updateBoxPosition(display, window, gc, *boxX, *boxY);
 }
 
 // Function to handle Expose events
@@ -62,6 +108,7 @@ int main() {
     GC gc;
     XEvent event;
     int screen;
+    int boxX = 400, boxY = 400; // Starting position of the box
 
     // Seed the random number generator
     srand(time(NULL));
@@ -89,22 +136,15 @@ int main() {
             if (event.type == Expose) {
                 handleExposeEvent(display, window, gc, &event);
             } else if (event.type == KeyPress) {
+                handleKeyPress(display, window, gc, &event, &boxX, &boxY);
+            } else if (event.type == KeyPress) {
                 cleanup(display, window, gc);
                 exit(0);
             }
         }
 
-        // Update the window at regular intervals
-        int min = 0;
-        int max = 780; // Adjusted to keep the box within the window
-        int randomX = (rand() % (max - min + 1)) + min;
-        int randomY = (rand() % (max - min + 1)) + min;
-
-        // Draw a box at the new random position
-        updateBoxPosition(display, window, gc, randomX, randomY);
-
         // Add a delay to control the update rate (e.g., 100 milliseconds)
-        usleep(500000); // Sleep for 100,000 microseconds (100 milliseconds)
+        usleep(100000); // Sleep for 100,000 microseconds (100 milliseconds)
     }
 
     // Clean up and close the connection (though this will never be reached in the current loop)
