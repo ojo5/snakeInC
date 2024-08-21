@@ -1,4 +1,4 @@
-# Snake Game V.1
+# Snake Game v1.0.0
 This repository contains a simple example of creating a window using the X Window System (Xlib) in C. The code demonstrates how to initialize a connection to the X server, create a window, handle basic events, and clean up resources.
 
 ## Overview
