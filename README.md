@@ -1,16 +1,17 @@
 # Snake Game v1.0.0
-This repository contains a simple example of creating a window using the X Window System (Xlib) in C. The code demonstrates how to initialize a connection to the X server, create a window, handle basic events, and clean up resources.
+This repository contains the beginning of Snake game implemented using the X Window System (Xlib) in C. The code demonstrates how to initialize a connection to the X server, create a window, handle basic events, and clean up resources.
 
 ## Overview
 The provided code showcases how to create and display a basic X11 window on Linux. It sets up the window with a specific size, position, and colors. The code also includes a basic event loop to handle window exposure and key press events.
 
-This project is a starting point for developing a more complex application, such as a Snake game, using the X Window System.
+This project is a starting point for developing a more complex application, using the X Window System.
 
 ## Features
 Create a simple window using Xlib.
 Set window properties including title and size.
 Handle basic X11 events like exposure and key presses.
 Draw a filled rectangle within the window.
+Movement of a rectangle with keybuttons.
 
 ### Prerequisites
 A Linux environment with Xlib development libraries installed.
