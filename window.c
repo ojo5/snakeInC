@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <unistd.h>  // For usleep
-#include <string.h> 
+#include <string.h>
 
 // Define keycodes for arrow keys and the exit key
 #define LEFT_ARROW  XK_Left
@@ -13,17 +13,27 @@
 #define DOWN_ARROW  XK_Down
 #define EXIT_KEY    XK_q
 
+// Define directions
+#define DIR_LEFT  0
+#define DIR_RIGHT 1
+#define DIR_UP    2
+#define DIR_DOWN  3
+
+// Define the maximum length of the trail
+#define MAX_TRAIL_LENGTH 1000
+
 // Function declarations
 Window createWindow(Display *display, int screen, int x, int y, unsigned int width, unsigned int height);
 GC createGraphicsContext(Display *display, Window window);
 void handleExposeEvent(Display *display, Window window, GC gc, XEvent *event);
-void updateBoxPosition(Display *display, Window window, GC gc, int newX, int newY);
-void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *boxX, int *boxY);
+void updateBoxPosition(Display *display, Window window, GC gc, int boxX, int boxY, int redX, int redY, int score, int trail[][2], int trailLength);
+void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *direction);
 void cleanup(Display *display, Window window, GC gc);
 void displayInitialScreen(Display *display, Window window, GC gc);
-void displayInitialScreen(Display *display, Window window, GC gc);
+int checkCollision(int boxX, int boxY, int redX, int redY);
+void moveBox(int *boxX, int *boxY, int direction);
 
-
+// Function to display the initial screen
 void displayInitialScreen(Display *display, Window window, GC gc) {
     // Fill the window with a black background
     XSetForeground(display, gc, BlackPixel(display, DefaultScreen(display)));
@@ -49,6 +59,7 @@ void displayInitialScreen(Display *display, Window window, GC gc) {
     XFlush(display);
 }
 
+// Function to create a window
 Window createWindow(Display *display, int screen, int x, int y, unsigned int width, unsigned int height) {
     Window window;
     // Set the background to black instead of white
@@ -72,34 +83,52 @@ GC createGraphicsContext(Display *display, Window window) {
 }
 
 // Function to update box position and clear the screen
-void updateBoxPosition(Display *display, Window window, GC gc, int newX, int newY) {
+void updateBoxPosition(Display *display, Window window, GC gc, int boxX, int boxY, int redX, int redY, int score, int trail[][2], int trailLength) {
     // Clear the entire window by filling it with black
     XSetForeground(display, gc, BlackPixel(display, DefaultScreen(display)));
     XFillRectangle(display, window, gc, 0, 0, 800, 800);
 
-    // Set the color for the new rectangle
-    XSetForeground(display, gc, WhitePixel(display, DefaultScreen(display)));
+    // Draw the stationary red square
+    XSetForeground(display, gc, 0xFF0000);  // Red color in hexadecimal (0xFF0000)
+    XFillRectangle(display, window, gc, redX, redY, 20, 20);  // Stationary red square
 
-    // Draw the box at the new position
-    XFillRectangle(display, window, gc, newX, newY, 20, 20);
+    // Draw the trail
+    XSetForeground(display, gc, WhitePixel(display, DefaultScreen(display)));
+    for (int i = 0; i < trailLength; i++) {
+        XFillRectangle(display, window, gc, trail[i][0], trail[i][1], 20, 20);
+    }
+
+    // Draw the moving white square (head of the trail)
+    XFillRectangle(display, window, gc, boxX, boxY, 20, 20);
+
+    // Display the score
+    char scoreText[50];
+    sprintf(scoreText, "Score: %d", score);
+    XSetForeground(display, gc, WhitePixel(display, DefaultScreen(display)));
+    XDrawString(display, window, gc, 10, 20, scoreText, strlen(scoreText));
+}
+
+// Function to check for collision between the white box and the red square
+int checkCollision(int boxX, int boxY, int redX, int redY) {
+    // Check if the white box overlaps with the red square
+    return (boxX < redX + 20 && boxX + 20 > redX && boxY < redY + 20 && boxY + 20 > redY);
 }
 
 // Function to handle KeyPress events
-void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *boxX, int *boxY) {
-    int moveAmount = 20; // Distance the box moves with each arrow key press
+void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *direction) {
     KeySym key = XLookupKeysym(&event->xkey, 0);
     switch (key) {
         case LEFT_ARROW:
-            *boxX -= moveAmount; // Move left
+            *direction = DIR_LEFT;
             break;
         case RIGHT_ARROW:
-            *boxX += moveAmount; // Move right
+            *direction = DIR_RIGHT;
             break;
         case UP_ARROW:
-            *boxY -= moveAmount; // Move up
+            *direction = DIR_UP;
             break;
         case DOWN_ARROW:
-            *boxY += moveAmount; // Move down
+            *direction = DIR_DOWN;
             break;
         case EXIT_KEY: // Press 'q' to exit
             cleanup(display, window, gc);
@@ -108,33 +137,39 @@ void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *
         default:
             break;
     }
+}
+
+// Function to move the box based on the current direction
+void moveBox(int *boxX, int *boxY, int direction) {
+    int moveAmount = 20; // Distance the box moves with each tick
+
+    switch (direction) {
+        case DIR_LEFT:
+            *boxX -= moveAmount;
+            break;
+        case DIR_RIGHT:
+            *boxX += moveAmount;
+            break;
+        case DIR_UP:
+            *boxY -= moveAmount;
+            break;
+        case DIR_DOWN:
+            *boxY += moveAmount;
+            break;
+    }
 
     // Ensure the box stays within the window boundaries
     if (*boxX < 0) *boxX = 0;
     if (*boxX > 780) *boxX = 780;
     if (*boxY < 0) *boxY = 0;
     if (*boxY > 780) *boxY = 780;
-
-    // Update the box position
-    updateBoxPosition(display, window, gc, *boxX, *boxY);
 }
 
 // Function to handle Expose events
 void handleExposeEvent(Display *display, Window window, GC gc, XEvent *event) {
     if (event->type == Expose) {
-        // Fill the window background with black
-        XFillRectangle(display, window, DefaultGC(display, DefaultScreen(display)), 0, 0, 800, 800);
-
-        // Draw 5 random boxes
-        for (int i = 0; i < 5; i++) {
-            int min = 0;
-            int max = 780; // Adjusted to keep the box within the window
-            int randomX = (rand() % (max - min + 1)) + min;
-            int randomY = (rand() % (max - min + 1)) + min;
-
-            // Draw the box at the new random position
-            updateBoxPosition(display, window, gc, randomX, randomY);
-        }
+        // Redraw the box at the last known position
+        // You can call updateBoxPosition with the last known position
     }
 }
 
@@ -151,7 +186,13 @@ int main() {
     GC gc;
     XEvent event;
     int screen;
-    int boxX = 400, boxY = 400; // Starting position of the box
+    int boxX = 400, boxY = 400; // Starting position of the white box
+    int redX = 200, redY = 200; // Starting position of the red square
+    int score = 0;  // Initial score
+    int trail[MAX_TRAIL_LENGTH][2];  // Array to store trail coordinates
+    int trailLength = 0;  // Initial trail length
+    int direction = DIR_RIGHT;  // Initial direction
+    int tickCount = 0;  // Tick counter
 
     // Seed the random number generator
     srand(time(NULL));
@@ -174,36 +215,51 @@ int main() {
 
     // Main event loop
     while (1) {
-        XNextEvent(display, &event);
+        // Process pending events
+        while (XPending(display)) {
+            XNextEvent(display, &event);
 
-        if (event.type == Expose) {
-            // Redraw the square if the window is exposed
-            handleExposeEvent(display, window, gc, &event);
-        } else if (event.type == KeyPress) {
-            // Exit the loop after the first key press
-            break;
-        } else if (event.type == KeyPress) {
-            handleKeyPress(display, window, gc, &event, &boxX, &boxY);
+            if (event.type == Expose) {
+                // Redraw the square if the window is exposed
+                handleExposeEvent(display, window, gc, &event);
+            } else if (event.type == KeyPress) {
+                handleKeyPress(display, window, gc, &event, &direction);
+            }
         }
 
-        // Display the initial screen before the first key press
-        displayInitialScreen(display, window, gc);
-    }
+        // Increment tick counter
+        tickCount++;
 
-    // Main event loop after the initial screen
-    while (1) {
-        XNextEvent(display, &event);
-        
-        if (event.type == Expose) {
-            // Redraw the square if the window is exposed
-            handleExposeEvent(display, window, gc, &event);
-        } else if (event.type == KeyPress) {
-            handleKeyPress(display, window, gc, &event, &boxX, &boxY);
+        // Move the box on every tick (adjust this number to change speed)
+        if (tickCount % 5 == 0) {  // Adjust the modulus to control the speed
+            // Move the box in the current direction
+            moveBox(&boxX, &boxY, direction);
+
+            // Update the trail
+            for (int i = trailLength; i > 0; i--) {
+                trail[i][0] = trail[i - 1][0];
+                trail[i][1] = trail[i - 1][1];
+            }
+            trail[0][0] = boxX;
+            trail[0][1] = boxY;
+
+            // Check for collision with the red square
+            if (checkCollision(boxX, boxY, redX, redY)) {
+                score++;
+                trailLength++;
+                // Move the red square to a new random location
+                redX = (rand() % 40) * 20;
+                redY = (rand() % 40) * 20;
+            }
+
+            // Redraw everything
+            updateBoxPosition(display, window, gc, boxX, boxY, redX, redY, score, trail, trailLength);
+
+            // Sleep for a short duration to control the tick rate
+            usleep(50000);  // Sleep for 50ms (20 ticks per second)
         }
     }
 
-    // Clean up and close the connection (though this will never be reached in the current loop)
-    cleanup(display, window, gc);
 
     return 0;
 }
