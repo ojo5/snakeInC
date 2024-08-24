@@ -13,6 +13,10 @@ Handle basic X11 events like exposure and key presses.
 Draw a filled rectangle within the window.
 Movement of a rectangle with keybuttons.
 
+### Bugs
+Needs to press twice a button twice before starting.
+Collect a point before growth.
+
 ### Prerequisites
 A Linux environment with Xlib development libraries installed.
 GCC (GNU Compiler Collection) for compiling the code.
