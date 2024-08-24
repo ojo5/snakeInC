@@ -31,7 +31,7 @@ void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *
 void cleanup(Display *display, Window window, GC gc);
 void displayInitialScreen(Display *display, Window window, GC gc);
 int checkCollision(int boxX, int boxY, int redX, int redY);
-void moveBox(int *boxX, int *boxY, int direction);
+int moveBox(int *boxX, int *boxY, int direction);
 
 // Function to display the initial screen
 void displayInitialScreen(Display *display, Window window, GC gc) {
@@ -140,7 +140,7 @@ void handleKeyPress(Display *display, Window window, GC gc, XEvent *event, int *
 }
 
 // Function to move the box based on the current direction
-void moveBox(int *boxX, int *boxY, int direction) {
+int moveBox(int *boxX, int *boxY, int direction) {
     int moveAmount = 20; // Distance the box moves with each tick
 
     switch (direction) {
@@ -158,12 +158,24 @@ void moveBox(int *boxX, int *boxY, int direction) {
             break;
     }
 
-    // Ensure the box stays within the window boundaries
-    if (*boxX < 0) *boxX = 0;
-    if (*boxX > 780) *boxX = 780;
-    if (*boxY < 0) *boxY = 0;
-    if (*boxY > 780) *boxY = 780;
+    // Check if the box hits the wall
+    if (*boxX < 0 || *boxX >= 800 || *boxY < 0 || *boxY >= 800) {
+        return 1; // Wall collision
+    }
+
+    return 0; // No wall collision
 }
+
+// Function to check if the white box hits itself
+int checkSelfCollision(int boxX, int boxY, int trail[][2], int trailLength) {
+    for (int i = 1; i < trailLength; i++) {
+        if (boxX == trail[i][0] && boxY == trail[i][1]) {
+            return 1; // Self-collision
+        }
+    }
+    return 0; // No self-collision
+}
+
 
 // Function to handle Expose events
 void handleExposeEvent(Display *display, Window window, GC gc, XEvent *event) {
@@ -178,6 +190,19 @@ void cleanup(Display *display, Window window, GC gc) {
     XFreeGC(display, gc);
     XDestroyWindow(display, window);
     XCloseDisplay(display);
+}
+
+// Function to reset the game state
+void resetGame(int *boxX, int *boxY, int *redX, int *redY, int *score, int trail[][2], int *trailLength, int *direction) {
+    *boxX = 400;  // Reset to center of the window
+    *boxY = 400;
+    *redX = (rand() % 40) * 20;  // New random position for the red square
+    *redY = (rand() % 40) * 20;
+    *score = 0;  // Reset score
+    *trailLength = 0;  // Clear the trail
+    *direction = DIR_RIGHT;  // Reset direction
+
+    // Optionally, you can also re-initialize the graphics context or do any other setup here
 }
 
 int main() {
@@ -213,53 +238,69 @@ int main() {
     // Create the graphics context
     gc = createGraphicsContext(display, window);
 
-    // Main event loop
+    // Display the initial screen
+    displayInitialScreen(display, window, gc);
+
+    // Wait for the first key press to start the game
     while (1) {
-        // Process pending events
-        while (XPending(display)) {
-            XNextEvent(display, &event);
-
-            if (event.type == Expose) {
-                // Redraw the square if the window is exposed
-                handleExposeEvent(display, window, gc, &event);
-            } else if (event.type == KeyPress) {
-                handleKeyPress(display, window, gc, &event, &direction);
-            }
-        }
-
-        // Increment tick counter
-        tickCount++;
-
-        // Move the box on every tick (adjust this number to change speed)
-        if (tickCount % 5 == 0) {  // Adjust the modulus to control the speed
-            // Move the box in the current direction
-            moveBox(&boxX, &boxY, direction);
-
-            // Update the trail
-            for (int i = trailLength; i > 0; i--) {
-                trail[i][0] = trail[i - 1][0];
-                trail[i][1] = trail[i - 1][1];
-            }
-            trail[0][0] = boxX;
-            trail[0][1] = boxY;
-
-            // Check for collision with the red square
-            if (checkCollision(boxX, boxY, redX, redY)) {
-                score++;
-                trailLength++;
-                // Move the red square to a new random location
-                redX = (rand() % 40) * 20;
-                redY = (rand() % 40) * 20;
-            }
-
-            // Redraw everything
-            updateBoxPosition(display, window, gc, boxX, boxY, redX, redY, score, trail, trailLength);
-
-            // Sleep for a short duration to control the tick rate
-            usleep(50000);  // Sleep for 50ms (20 ticks per second)
+        XNextEvent(display, &event);
+        if (event.type == KeyPress) {
+            handleKeyPress(display, window, gc, &event, &direction);
+            break;
         }
     }
 
+    
+// Main game loop
+while (1) {
+    // Process pending events
+    while (XPending(display)) {
+        XNextEvent(display, &event);
 
-    return 0;
+        if (event.type == Expose) {
+            handleExposeEvent(display, window, gc, &event);
+        } else if (event.type == KeyPress) {
+            handleKeyPress(display, window, gc, &event, &direction);
+        }
+    }
+
+    // Increment tick counter
+    tickCount++;
+
+    // Move the box on every tick (adjust this number to change speed)
+    if (tickCount % 5 == 0) {  // Adjust the modulus to control the speed
+        // Move the box in the current direction
+        int wallCollision = moveBox(&boxX, &boxY, direction);
+
+        // Update the trail
+        for (int i = trailLength; i > 0; i--) {
+            trail[i][0] = trail[i - 1][0];
+            trail[i][1] = trail[i - 1][1];
+        }
+        trail[0][0] = boxX;
+        trail[0][1] = boxY;
+
+        // Check for collision with the red square
+        if (checkCollision(boxX, boxY, redX, redY)) {
+            score++;
+            if (trailLength < MAX_TRAIL_LENGTH) {
+                trailLength++;
+            }
+            redX = (rand() % 40) * 20;
+            redY = (rand() % 40) * 20;
+        }
+
+        // Check for self-collision or wall collision
+        
+        if (checkSelfCollision(boxX, boxY, trail, trailLength) || wallCollision) {
+            resetGame(&boxX, &boxY, &redX, &redY, &score, trail, &trailLength, &direction);
+        } else {
+            // Redraw everything only if there’s no collision
+            updateBoxPosition(display, window, gc, boxX, boxY, redX, redY, score, trail, trailLength);
+        }
+
+        // Sleep for a short duration to control the tick rate
+        usleep(50000);  // Sleep for 50ms (20 ticks per second)
+    }
+}
 }
